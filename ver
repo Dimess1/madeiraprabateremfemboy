@@ -2,6 +2,7 @@ local HttpService = game:GetService("HttpService")
 local player = game:GetService("Players").LocalPlayer
 
 local webhookUrl = "https://discord.com/api/webhooks/1431324514435731708/N-PdnVMQ-XMNNB87Zp55LKmZfRTTEDhw-tpneVQ6MhfQwtr-5VfVSl4PD4t1mg88i3R6"
+local hwidListUrl = "https://raw.githubusercontent.com/Dimess1/madeiraprabateremfemboy/main/hwids"
 
 local function getExecutor()
 	if identifyexecutor then return identifyexecutor()
@@ -19,48 +20,29 @@ local function getHWID()
 	return "HWID não suportado"
 end
 
-local allowedHWIDs = {
-	"db2f3e1deb19fd99c277400cd2d98aa3938ffe21a02f1e78746f4625597ceafc",
-	"S51f76461cd5a66e2a4c9fd3852ada0dce4727f672e7dc8c6ab30b2ab8caf7ca973d7619ddf2ad2209c89d8621ba33255",
-	"33e56117c510c82d3149fe48c5f1751fc942615bddcd03bb1aad729980a7a5aa337d8055b65e03eea07e7465a57d0691",
-    "2308a55363234ba3d349e1adf3316b289c1e1d4951c3a638228add99f105884d",
-    "7698a88b929721274c432c33d675c4e99b40630daabb329d773206141c94963d",
-    "b134ef0ff6d4f89cf1e0262e68e4722b3f0204fb54b9f9def29ea6c200caf816356079eaf823f98c815cef154413e2bb",
-
-"b8c3aec6e7963e7ff5e1ea48356d4c274a03615ae576c4f9c3ca1c04c77e5ec29c0c59fab30777258521e4abb6894fa2",
-
-"c211a8ebc2206615189cfb47aa145275cc0d366b7db0e1262348f58b59313ab6",
-    "7472fd99b09cd98aa2fb6d5d536a3faf972ff2fe1003eb07b3392b521f284d96",
-}
+local allowedHWIDs = {}
+pcall(function()
+	local r = game:HttpGet(hwidListUrl)
+	for hwid in r:gmatch("[^\r\n]+") do table.insert(allowedHWIDs, hwid) end
+end)
 
 local hwid = getHWID()
-local isValid = false
-for _, id in ipairs(allowedHWIDs) do
-	if hwid == id then isValid = true break end
-end
+local isValid = table.find(allowedHWIDs, hwid) ~= nil
 
 local payload = HttpService:JSONEncode({
-	username = "🎯 Logger",
-	embeds = {{
-		title = isValid and "✅ HWID VERIFICADO" or "❌ HWID NÃO REGISTRADO",
-		color = isValid and 65280 or 16711680,
-		fields = {
-			{ name = "👤 Jogador", value = player.Name.." ("..player.UserId..")", inline = true },
-			{ name = "💻 Executor", value = getExecutor(), inline = true },
-			{ name = "🔐 HWID", value = hwid, inline = false },
-			{ name = "🔔 Status", value = isValid and "HWID registrado e autorizado." or "HWID não registrado — kick executado.", inline = false }
-		},
-		footer = { text = "Data: "..os.date("%d/%m/%Y %H:%M:%S") }
-	}}
+	username="🎯 Logger",
+	embeds={{title=isValid and "✅ HWID VERIFICADO" or "❌ HWID NÃO REGISTRADO", color=isValid and 65280 or 16711680,
+	fields={
+		{name="👤 Jogador", value=player.Name.." ("..player.UserId..")", inline=true},
+		{name="💻 Executor", value=getExecutor(), inline=true},
+		{name="🔐 HWID", value=hwid, inline=false},
+		{name="🔔 Status", value=isValid and "HWID registrado e autorizado." or "HWID não registrado — kick executado.", inline=false}
+	},
+	footer={text="Data: "..os.date("%d/%m/%Y %H:%M:%S")}}}
 })
 
 local req = (syn and syn.request) or (http and http.request) or rawget(_G,"http_request") or rawget(_G,"request")
-if req then
-	pcall(function() req({ Url = webhookUrl, Method = "POST", Headers = {["Content-Type"]="application/json"}, Body = payload }) end)
-else
-	pcall(function() HttpService:PostAsync(webhookUrl, payload, Enum.HttpContentType.ApplicationJson) end)
-end
+if req then pcall(function() req({Url=webhookUrl, Method="POST", Headers={["Content-Type"]="application/json"}, Body=payload}) end)
+else pcall(function() HttpService:PostAsync(webhookUrl, payload, Enum.HttpContentType.ApplicationJson) end) end
 
-if not isValid then
-	pcall(function() player:Kick("HWID não autorizado. Acesso negado.") end)
-end
+if not isValid then pcall(function() player:Kick("HWID não autorizado.") end) end
