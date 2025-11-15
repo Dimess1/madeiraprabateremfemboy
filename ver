@@ -1,1 +1,84 @@
-print("a")
+local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+
+local webhookUrl = "https://discord.com/api/webhooks/1431324514435731708/N-PdnVMQ-XMNNB87Zp55LKmZfRTTEDhw-tpneVQ6MhfQwtr-5VfVSl4PD4t1mg88i3R6"
+local hwidListUrl = "https://raw.githubusercontent.com/Dimess1/madeiraprabateremfemboy/main/hwids"
+
+-- Função para detectar executor
+local function getExecutor()
+    if identifyexecutor then
+        return identifyexecutor()
+    elseif getexecutorname then
+        return getexecutorname()
+    else
+        return "Executor desconhecido"
+    end
+end
+
+-- Função para pegar HWID
+local function getHWID()
+    if syn and syn.gethwid then
+        return syn.gethwid()
+    elseif gethwid then
+        return gethwid()
+    elseif krnl and krnl.gethwid then
+        return krnl.gethwid()
+    elseif identifyexecutor and identifyexecutor():lower():find("script-ware") and typeof(crypt) == "table" and crypt.generatehwid then
+        return crypt.generatehwid()
+    end
+    return "HWID não suportado"
+end
+
+-- Pegar todos os HWIDs permitidos
+local allowedHWIDs = {}
+pcall(function()
+    local response = game:HttpGet(hwidListUrl)
+    -- Cada linha do arquivo é um HWID
+    for hwid in response:gmatch("[^\r\n]+") do
+        table.insert(allowedHWIDs, hwid)
+    end
+end)
+
+local hwid = getHWID()
+local isValid = table.find(allowedHWIDs, hwid) ~= nil
+
+-- Payload para Discord
+local payload = HttpService:JSONEncode({
+    username = "🎯 Logger",
+    embeds = {{
+        title = isValid and "✅ HWID VERIFICADO" or "❌ HWID NÃO REGISTRADO",
+        color = isValid and 65280 or 16711680,
+        fields = {
+            {name = "👤 Jogador", value = player.Name.." ("..player.UserId..")", inline = true},
+            {name = "💻 Executor", value = getExecutor(), inline = true},
+            {name = "🔐 HWID", value = hwid, inline = false},
+            {name = "🔔 Status", value = isValid and "HWID registrado e autorizado." or "HWID não registrado — kick executado.", inline = false}
+        },
+        footer = {text = "Data: "..os.date("%d/%m/%Y %H:%M:%S")}
+    }}
+})
+
+-- Envio do webhook
+local req = (syn and syn.request) or (http and http.request) or rawget(_G,"http_request") or rawget(_G,"request")
+if req then
+    pcall(function()
+        req({
+            Url = webhookUrl,
+            Method = "POST",
+            Headers = {["Content-Type"] = "application/json"},
+            Body = payload
+        })
+    end)
+else
+    pcall(function()
+        HttpService:PostAsync(webhookUrl, payload, Enum.HttpContentType.ApplicationJson)
+    end)
+end
+
+-- Kick do jogador se HWID não for válido
+if not isValid then
+    pcall(function()
+        player:Kick("HWID não autorizado.")
+    end)
+end
