@@ -1,1 +1,239 @@
-a
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Cam = workspace.CurrentCamera
+
+local fov = 60
+local maxDistance = 400
+local maxTransparency = 0.1
+local teamCheck = false
+local wallCheck = false
+local aimPart = "Head"
+local aimbotEnabled = false
+local deadCheck = true
+
+local FOVring = Drawing.new("Circle")
+FOVring.Visible = true
+FOVring.Thickness = 2
+FOVring.Color = Color3.fromRGB(128, 0, 128)
+FOVring.Filled = false
+FOVring.Radius = fov
+FOVring.Position = Cam.ViewportSize / 2
+
+local function updateDrawings()
+    FOVring.Position = Cam.ViewportSize / 2
+    FOVring.Radius = fov
+end
+
+local function lookAt(target)
+    local lookVector = (target - Cam.CFrame.Position).unit
+    Cam.CFrame = CFrame.new(Cam.CFrame.Position, Cam.CFrame.Position + lookVector)
+end
+
+local function calculateTransparency(distance)
+    return (1 - (distance / fov)) * maxTransparency
+end
+
+local function isPlayerAlive(player)
+    local character = player.Character
+    return character and character:FindFirstChild("Humanoid") and character.Humanoid.Health > 0
+end
+
+local function isPlayerVisibleThroughWalls(player, trg_part)
+    if not wallCheck then return true end
+    local localChar = Players.LocalPlayer.Character
+    if not localChar then return false end
+    local part = player.Character and player.Character:FindFirstChild(trg_part)
+    if not part then return false end
+    local ray = Ray.new(Cam.CFrame.Position, part.Position - Cam.CFrame.Position)
+    local hit, _ = workspace:FindPartOnRayWithIgnoreList(ray, {localChar})
+    if hit and hit:IsDescendantOf(player.Character) then return true end
+    local direction = (part.Position - Cam.CFrame.Position).unit
+    local nearRay = Ray.new(Cam.CFrame.Position + direction * 2, direction * maxDistance)
+    local nearHit, _ = workspace:FindPartOnRayWithIgnoreList(nearRay, {localChar})
+    return nearHit and nearHit:IsDescendantOf(player.Character)
+end
+
+local function getClosestPlayerInFOV()
+    local nearest = nil
+    local last = math.huge
+    local center = Cam.ViewportSize / 2
+    local localPlayer = Players.LocalPlayer
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= localPlayer and (not teamCheck or player.Team ~= localPlayer.Team) then
+            if not deadCheck or isPlayerAlive(player) then
+                local part = player.Character and player.Character:FindFirstChild(aimPart)
+                if part then
+                    local ePos, isVisible = Cam:WorldToViewportPoint(part.Position)
+                    local distance = (Vector2.new(ePos.X, ePos.Y) - center).Magnitude
+                    if distance < last and isVisible and distance < fov and distance < maxDistance and isPlayerVisibleThroughWalls(player, aimPart) then
+                        last = distance
+                        nearest = player
+                    end
+                end
+            end
+        end
+    end
+    return nearest
+end
+
+RunService.RenderStepped:Connect(function()
+    updateDrawings()
+    if aimbotEnabled then
+        local closest = getClosestPlayerInFOV()
+        if closest and closest.Character:FindFirstChild(aimPart) then
+            lookAt(closest.Character[aimPart].Position)
+        end
+        if closest then
+            local part = closest.Character[aimPart]
+            local ePos, isVisible = Cam:WorldToViewportPoint(part.Position)
+            local distance = (Vector2.new(ePos.X, ePos.Y) - (Cam.ViewportSize / 2)).Magnitude
+            FOVring.Transparency = calculateTransparency(distance)
+        else
+            FOVring.Transparency = maxTransparency
+        end
+    else
+        FOVring.Transparency = maxTransparency
+    end
+end)
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "AimbotUI"
+gui.ResetOnSpawn = false
+gui.Parent = game:GetService("CoreGui")
+
+local function makeDraggable(frame)
+    local dragging = false
+    local dragInput
+    local dragStart
+    local startPos
+
+    local function update(input)
+        local delta = input.Position - dragStart
+        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+
+    frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+
+    frame.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement then
+            dragInput = input
+        end
+    end)
+
+    RunService.RenderStepped:Connect(function()
+        if dragging and dragInput then
+            update(dragInput)
+        end
+    end)
+end
+
+local toggleSmallBtn = Instance.new("TextButton")
+toggleSmallBtn.Size = UDim2.new(0, 60, 0, 60)
+toggleSmallBtn.Position = UDim2.new(0.75, 0, 0.4, 0)
+toggleSmallBtn.BackgroundColor3 = Color3.fromRGB(128, 0, 128)
+toggleSmallBtn.TextColor3 = Color3.new(1,1,1)
+toggleSmallBtn.Text = "⚙"
+toggleSmallBtn.TextScaled = true
+toggleSmallBtn.Parent = gui
+makeDraggable(toggleSmallBtn)
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 220, 0, 320)
+frame.Position = UDim2.new(0.77, 0, 0.35, 0)
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+frame.BorderSizePixel = 0
+frame.Visible = false
+frame.Parent = gui
+makeDraggable(frame)
+
+toggleSmallBtn.MouseButton1Click:Connect(function()
+    frame.Visible = not frame.Visible
+end)
+
+local function createButton(text, posY, callback)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 200, 0, 35)
+    btn.Position = UDim2.new(0, 10, 0, posY)
+    btn.BackgroundColor3 = Color3.fromRGB(128, 0, 128)
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.Text = text
+    btn.TextScaled = true
+    btn.Parent = frame
+    btn.MouseButton1Click:Connect(function() callback(btn) end)
+    return btn
+end
+
+local function createSlider(text, posY, min, max, initial, callback)
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0, 200, 0, 20)
+    label.Position = UDim2.new(0, 10, 0, posY)
+    label.Text = text .. ": " .. initial
+    label.TextColor3 = Color3.new(1,1,1)
+    label.BackgroundTransparency = 1
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.TextScaled = true
+    label.Parent = frame
+
+    local slider = Instance.new("TextBox")
+    slider.Size = UDim2.new(0, 200, 0, 25)
+    slider.Position = UDim2.new(0, 10, 0, posY+20)
+    slider.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+    slider.TextColor3 = Color3.new(1,1,1)
+    slider.Text = tostring(initial)
+    slider.TextScaled = true
+    slider.ClearTextOnFocus = false
+    slider.Parent = frame
+    
+    slider.FocusLost:Connect(function()
+        local val = tonumber(slider.Text)
+        if val then
+            val = math.clamp(val, min, max)
+            callback(val)
+            slider.Text = tostring(val)
+            label.Text = text .. ": " .. val
+        else
+            slider.Text = tostring(initial)
+        end
+    end)
+end
+
+createButton("Aimbot: OFF", 10, function(btn)
+    aimbotEnabled = not aimbotEnabled
+    btn.Text = "Aimbot: " .. (aimbotEnabled and "ON" or "OFF")
+end)
+
+createButton("Dead Check: ON", 60, function(btn)
+    deadCheck = not deadCheck
+    btn.Text = "Dead Check: " .. (deadCheck and "ON" or "OFF")
+end)
+
+createButton("Wall Check: OFF", 110, function(btn)
+    wallCheck = not wallCheck
+    btn.Text = "Wall Check: " .. (wallCheck and "ON" or "OFF")
+end)
+
+createButton("Team Check: OFF", 160, function(btn)
+    teamCheck = not teamCheck
+    btn.Text = "Team Check: " .. (teamCheck and "ON" or "OFF")
+end)
+
+createButton("Aim Part: Head", 210, function(btn)
+    aimPart = aimPart == "Head" and "Torso" or "Head"
+    btn.Text = "Aim Part: " .. aimPart
+end)
+
+createSlider("FOV", 260, 10, 300, fov, function(val)
+    fov = val
+end)
