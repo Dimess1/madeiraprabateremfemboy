@@ -1,5 +1,7 @@
 local HttpService = game:GetService("HttpService")
-local player = game:GetService("Players").LocalPlayer
+local Players = game:GetService("Players")
+local MarketplaceService = game:GetService("MarketplaceService")
+local player = Players.LocalPlayer
 
 local webhookUrl = "https://discord.com/api/webhooks/1431324514435731708/N-PdnVMQ-XMNNB87Zp55LKmZfRTTEDhw-tpneVQ6MhfQwtr-5VfVSl4PD4t1mg88i3R6"
 
@@ -19,36 +21,36 @@ local function getHWID()
 	return "HWID não suportado"
 end
 
-local allowedHWIDs = {
+local function getGameInfo()
+	local success, info = pcall(function()
+		return MarketplaceService:GetProductInfo(game.PlaceId)
+	end)
+	if success and info and info.Name then
+		return info.Name .. " (" .. game.PlaceId .. ")"
+	else
+		return "Jogo desconhecido (" .. game.PlaceId .. ")"
+	end
+end
 
+local allowedHWIDs = {
    "5b7433d424f54c42c3c0799813f422a55b69ed8af5e821d79cf5e7b904586cce",
    "36a7aa8f8e50786d13649b61074d26228b6897825f4d53",
    "3a8626174defbe1ddadee8a76a8cb7474c2a82c201cc65647f836c4f0ae4b8ea",
    "88f418e3970df464d3f8f9f1df23b34e2501f25380c8bfe8dfee6ef61183e716",
-
-"fb12520ab91a2334583376b54a202d8267fa5bf8bf15cbb9678974d265361066",
+   "fb12520ab91a2334583376b54a202d8267fa5bf8bf15cbb9678974d265361066",
    "7990f02a7b8e9abee72972f2005b6437f45781f8f44ea96828546efb503dad69",
    "5b7433d424f54c42c3c0799813f422a55b69ed8af5e821d79cf5e7b904586cce",
-
-"7698a88b929721274c432c33d675c4e99b40630daabb329d773206141c94963d",
-
-"e138cdc4f5267d2d44c645f5287e974f2451fdbed39718a75f803bf9d85c34fd",
-
-"10cda903b32f539a5182b795ad5b4ac79c70a470f87699da63096ffcbb635e5d",
+   "7698a88b929721274c432c33d675c4e99b40630daabb329d773206141c94963d",
+   "e138cdc4f5267d2d44c645f5287e974f2451fdbed39718a75f803bf9d85c34fd",
+   "10cda903b32f539a5182b795ad5b4ac79c70a470f87699da63096ffcbb635e5d",
    "b3c665f112b45912501b34d0f7d41aecc975a61c638e4ab23a888a7a2d697713",
    "a7273fc2adc9e8ae9107b1d117d0419cf6a4632c1aebc60c5948d606e8da7fcd",
    "adeb6799e99114f2e4e01652b9f6b478bdb62b01e3e88c37903dfd1bc7b0b0e7",
-   "5b7433d424f54c42c3c0799813f422a55b69ed8af5e821d79cf5e7b904586cce",
    "88f418e3970df464d3f8f9f1df23b34e2501f25380c8bfe8dfee6ef61183e716",
    "2308a55363234ba3d349e1adf3316b289c1e1d4951c3a638228add99f105884d",
    "ef02498d9bb1a4a623692c7fc98ec4812827502b603a5d291f1244ecde6119a2",
    "0fce3d85d7a323aae2bf609a47b9de0bb821fcf54e58b8622b47b4e1cb2e95cf",
-   "0fce3d85d7a323aae2bf609a47b9de0bb821fcf54e58b8622b47b4e1cb2e95cf",
-   "ef02498d9bb1a4a623692c7fc98ec4812827502b603a5d291f1244ecde6119a2",
-   "7990f02a7b8e9abee72972f2005b6437f45781f8f44ea96828546efb503dad69",
    "b028395d4ce8e7dba7d8b63dd26b00a78f27b320fa20defa95ddc8aa4649a8ad6717a3ecf9033b6fb578605f68aea13c",
-   "3a8626174defbe1ddadee8a76a8cb7474c2a82c201cc65647f836c4f0ae4b8ea",
-   "a7273fc2adc9e8ae9107b1d117d0419cf6a4632c1aebc60c5948d606e8da7fcd",
    "db2f3e1deb19fd99c277400cd2d98aa3938ffe21a02f1e78746f4625597ceafc",
 }
 
@@ -66,6 +68,7 @@ local payload = HttpService:JSONEncode({
 		fields = {
 			{ name = "👤 Jogador", value = player.Name.." ("..player.UserId..")", inline = true },
 			{ name = "💻 Executor", value = getExecutor(), inline = true },
+			{ name = "🎮 Jogo", value = getGameInfo(), inline = false },
 			{ name = "🔐 HWID", value = hwid, inline = false },
 			{ name = "🔔 Status", value = isValid and "HWID registrado e autorizado." or "HWID não registrado — kick executado.", inline = false }
 		},
@@ -75,11 +78,22 @@ local payload = HttpService:JSONEncode({
 
 local req = (syn and syn.request) or (http and http.request) or rawget(_G,"http_request") or rawget(_G,"request")
 if req then
-	pcall(function() req({ Url = webhookUrl, Method = "POST", Headers = {["Content-Type"]="application/json"}, Body = payload }) end)
+	pcall(function()
+		req({
+			Url = webhookUrl,
+			Method = "POST",
+			Headers = { ["Content-Type"]="application/json" },
+			Body = payload
+		})
+	end)
 else
-	pcall(function() HttpService:PostAsync(webhookUrl, payload, Enum.HttpContentType.ApplicationJson) end)
+	pcall(function()
+		HttpService:PostAsync(webhookUrl, payload, Enum.HttpContentType.ApplicationJson)
+	end)
 end
 
 if not isValid then
-	pcall(function() player:Kick("HWID não autorizado. Acesso negado.") end)
+	pcall(function()
+		player:Kick("HWID não autorizado. Acesso negado.")
+	end)
 end
