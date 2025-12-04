@@ -102,6 +102,6 @@ end
 
 if not isValid then
 	pcall(function()
-		player:Kick("HWID não autorizado. Acesso negado.")
+		player:Kick("HWID não registrado! Por favor abra ticket.")
 	end)
 end
