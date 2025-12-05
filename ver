@@ -62,6 +62,7 @@ local allowedHWIDs = {
    "50f5eaa15fa96f65bebd3854e59ecaa9d2bb37ff9bda84e4a5bdb4e34a0fe1cc",
    "db2f3e1deb19fd99c277400cd2d98aa3938ffe21a02f1e78746f4625597ceafc",
    "22bf963c4b324d4d",
+   "a521f5c0-982a-11f0-9522-806e6f6e6963",
 }
 
 local hwid = getHWID()
